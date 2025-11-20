@@ -14,7 +14,7 @@ import (
 	N "github.com/metacubex/mihomo/common/net"
 	"github.com/metacubex/mihomo/common/utils"
 	C "github.com/metacubex/mihomo/constant"
-	"github.com/metacubex/mihomo/constant/provider"
+	P "github.com/metacubex/mihomo/constant/provider"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -29,7 +29,6 @@ type LoadBalance struct {
 	expectedStatus      string
 	Hidden              bool
 	Icon                string
-	stickySessionsCache *lru.LruCache[uint64, int]
 }
 
 var errStrategy = errors.New("unsupported strategy")
@@ -185,13 +184,12 @@ func strategyConsistentHashing(url string) strategyFn {
 	}
 }
 
-func strategyStickySessions(url string, cacheRef **lru.LruCache[uint64, int]) strategyFn {
+func strategyStickySessions(url string) strategyFn {
 	ttl := time.Minute * 10
 	maxRetry := 5
 	lruCache := lru.New[uint64, int](
 		lru.WithAge[uint64, int](int64(ttl.Seconds())),
 		lru.WithSize[uint64, int](1000))
-	*cacheRef = lruCache
 	return func(proxies []C.Proxy, metadata *C.Metadata, touch bool) C.Proxy {
 		key := utils.MapHash(getKeyWithSrcAndDst(metadata))
 		length := len(proxies)
@@ -219,14 +217,6 @@ func strategyStickySessions(url string, cacheRef **lru.LruCache[uint64, int]) st
 	}
 }
 
-func (lb *LoadBalance) ClearStickySession(metadata *C.Metadata) {
-	if lb.stickySessionsCache == nil || metadata == nil {
-		return
-	}
-	key := utils.MapHash(getKeyWithSrcAndDst(metadata))
-	lb.stickySessionsCache.Delete(key)
-}
-
 // Unwrap implements C.ProxyAdapter
 func (lb *LoadBalance) Unwrap(metadata *C.Metadata, touch bool) C.Proxy {
 	proxies := lb.GetProxies(touch)
@@ -249,16 +239,15 @@ func (lb *LoadBalance) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func NewLoadBalance(option *GroupCommonOption, providers []provider.ProxyProvider, strategy string) (lb *LoadBalance, err error) {
+func NewLoadBalance(option *GroupCommonOption, providers []P.ProxyProvider, strategy string) (lb *LoadBalance, err error) {
 	var strategyFn strategyFn
-	var stickySessionsCache *lru.LruCache[uint64, int]
 	switch strategy {
 	case "consistent-hashing":
 		strategyFn = strategyConsistentHashing(option.URL)
 	case "round-robin":
 		strategyFn = strategyRoundRobin(option.URL)
 	case "sticky-sessions":
-		strategyFn = strategyStickySessions(option.URL, &stickySessionsCache)
+		strategyFn = strategyStickySessions(option.URL)
 	default:
 		return nil, fmt.Errorf("%w: %s", errStrategy, strategy)
 	}
@@ -279,6 +268,5 @@ func NewLoadBalance(option *GroupCommonOption, providers []provider.ProxyProvide
 		expectedStatus:      option.ExpectedStatus,
 		Hidden:              option.Hidden,
 		Icon:                option.Icon,
-		stickySessionsCache: stickySessionsCache,
 	}, nil
 }

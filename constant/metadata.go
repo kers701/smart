@@ -38,6 +38,7 @@ const (
 	TUIC
 	HYSTERIA2
 	ANYTLS
+	MIERU
 	INNER
 )
 
@@ -109,6 +110,8 @@ func (t Type) String() string {
 		return "Hysteria2"
 	case ANYTLS:
 		return "AnyTLS"
+	case MIERU:
+		return "Mieru"
 	case INNER:
 		return "Inner"
 	default:
@@ -149,6 +152,8 @@ func ParseType(t string) (*Type, error) {
 		res = HYSTERIA2
 	case "ANYTLS":
 		res = ANYTLS
+	case "MIERU":
+		res = MIERU
 	case "INNER":
 		res = INNER
 	default:
@@ -187,7 +192,8 @@ type Metadata struct {
 	RemoteDst    string     `json:"remoteDestination"`
 	DSCP         uint8      `json:"dscp"`
 	UUID         string     `json:"id,omitempty"` // ID is used to identify the connection for smart
-	SmartBlock   string     `json:"smartBlock"` // SmartBlock indicates if the node selected by smart group should be blocked for this connection
+	SmartBlock   string     `json:"smartBlock"`   // SmartBlock indicates if the node selected by smart group should be blocked for this connection
+	SmartTarget  string     `json:"smartTarget"`  // SmartTarget indicates the target domain/ip for smart group node selection
 
 	RawSrcAddr net.Addr `json:"-"`
 	RawDstAddr net.Addr `json:"-"`
