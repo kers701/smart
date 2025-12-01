@@ -1,0 +1,35 @@
+name: Sync Upstream Alpha Branch
+
+on:
+  schedule:
+    # 每天 UTC 00:30（北京时间 08:30）自动同步一次，可调整为 '0 */6 * * *'（每 6 小时）
+    - cron: '30 0 * * *'
+  workflow_dispatch:  # 支持手动触发（在 Actions 页面点击 Run workflow）
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your fork
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # 获取完整历史，便于 reset
+
+      - name: Sync from upstream
+        run: |
+          # 添加/更新上游远程
+          git remote remove upstream || true
+          git remote add upstream https://github.com/vernesong/mihomo.git
+          git fetch upstream --tags  # 拉取上游所有分支和标签
+
+          # 切换到 Alpha 分支并强制重置到上游最新
+          git checkout Alpha
+          git reset --hard upstream/Alpha
+          
+          # 强制推送到你的 fork（覆盖本地变更）
+          git push origin Alpha --force --tags
+
+      - name: Notify on failure (optional)
+        if: failure()
+        run: echo "Sync failed! Check logs and retry manually."
